@@ -1,0 +1,11 @@
+INSERT OR IGNORE INTO tips (id, tip) VALUES (0, 'Use `gg` to go to top of file.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (1, 'Use `:w` to save your file.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (2, 'Use `:q` to quit Vim.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (3, 'Press `u` to undo your last change.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (4, 'Press `Ctrl+r` to redo an undone change.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (5, 'Use `yy` to copy a line.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (6, 'Use `dd` to delete a line.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (7, 'Use `p` to paste after the cursor.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (8, 'Use `P` to paste before the cursor.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (9, 'Press `v` to enter visual mode and select text.');
+INSERT OR IGNORE INTO tips (id, tip) VALUES (10, 'Press `Ctrl+v` to select a block of text (visual block mode).');
