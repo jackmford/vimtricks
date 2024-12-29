@@ -1,5 +1,6 @@
 /* Parent container width */
 .max-w-md {
+  width: 100%;         /* Full width of its parent */
   max-width: 400px;    /* Constrained to a max width */
 }
 

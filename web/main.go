@@ -17,14 +17,12 @@ type Tip struct {
 }
 
 func main() {
-	// Load tips
-	tips, err := loadTips("tips.json")
+	tips, err := loadTips("./web/tips.json")
 	if err != nil {
 		panic(err)
 	}
 
-	// Set up Gin
-	r := gin.Default()
+  r := gin.Default()
 
   r.Static("/static", "./static")
 
