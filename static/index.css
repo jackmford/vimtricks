@@ -1,0 +1,13 @@
+/* Parent container width */
+.max-w-md {
+  max-width: 400px;    /* Constrained to a max width */
+}
+
+/* Fix for the #vim-tip text */
+#vim-tip {
+  width: 100%;            /* Ensure the text box takes full width */
+  max-width: 100%;        /* Prevent expanding beyond its parent */
+  height: auto;           /* Allow vertical expansion */
+  white-space: normal;    /* Allow normal text wrapping */
+  overflow: hidden;       /* Hide overflow content */
+}

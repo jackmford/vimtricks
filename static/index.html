@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="index.css">
+  <title>Vim Daily Tip</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<style>
+    /* Parent container width */
+    .max-w-md {
+      width: 100%;         /* Full width of its parent */
+      max-width: 400px;    /* Constrained to a max width */
+      margin: 0 auto;      /* Center the element */
+    }
+
+    /* Fix for the #vim-tip text */
+    #vim-tip {
+      width: 100%;            /* Ensure the text box takes full width */
+      max-width: 100%;        /* Prevent expanding beyond its parent */
+      height: auto;           /* Allow vertical expansion */
+      white-space: normal;    /* Allow normal text wrapping */
+      overflow: hidden;       /* Hide overflow content */
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="max-w-md bg-white rounded-lg shadow-md p-6 text-center">
+    <h1 class="text-2xl font-bold text-gray-800">Daily Vim Tip</h1>
+    <p id="vim-tip" class="mt-4 text-gray-600 text-lg">Loading...</p>
+    <button id="random-tip-btn" 
+            class="mt-6 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 transition">
+      Show Random Tip
+    </button>
+  </div>
+
+  <script>
+    // Fetch the daily tip
+    fetch('/daily-tip')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('vim-tip').innerText = data.tip;
+      })
+      .catch(error => {
+        console.error('Error fetching tip:', error);
+      });
+
+    // Fetch a random tip on button click
+    document.getElementById('random-tip-btn').addEventListener('click', () => {
+      fetch('/random-tip')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('vim-tip').innerText = data.tip;
+        })
+        .catch(error => {
+          console.error('Error fetching random tip:', error);
+        });
+    });
+  </script>
+</body>
+</html>
+
