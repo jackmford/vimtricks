@@ -1,0 +1,11 @@
+[Unit]
+Description=vimtricks
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+ExecStart=vimtricks
+
+[Install]
+WantedBy=multi-user.target

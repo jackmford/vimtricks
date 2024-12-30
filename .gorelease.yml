@@ -1,0 +1,22 @@
+builds:
+  - main: ./web/main.go
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+nfpms:
+  - package_name: vimtricks
+    file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    homepage: https://github.com/jackmford/vimtricks
+    maintainer: Jack Fordyce
+    description: Vimtricks
+    license: MIT
+    formats:
+      - deb
+    bindir: /usr/bin
+    contents:
+      - src: script/vimtricks.service
+        dst: /lib/systemd/system/vimtricks.service
+        type: config
+
