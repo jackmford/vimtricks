@@ -2,6 +2,7 @@ package main
 
 import (
   "database/sql"
+  "embed"
 	"fmt"
   "net/http"
 	"time"
@@ -16,6 +17,7 @@ import (
 )
 
 var db *sql.DB
+var staticFiles embed.FS
 
 func executeSQLFile(filename string) {
 	file, err := os.Open(filename)
@@ -118,8 +120,8 @@ func main() {
   executeSQLFile("./web/populate.sql")
 
   r := gin.Default()
-
-  r.Static("/static", "./static")
+  r.StaticFS("/static", http.FS(staticFiles))
+  //r.Static("/static", "./static")
 
   r.GET("/", func(c *gin.Context) {
     c.File("static/index.html")
