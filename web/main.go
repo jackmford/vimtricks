@@ -1,34 +1,34 @@
 package main
 
 import (
-  "database/sql"
-  "embed"
+  "bytes"
+	"database/sql"
+	"embed"
 	"fmt"
-  "net/http"
+	"log"
+	"math/rand"
+	"net/http"
 	"time"
-  "math/rand"
 
-  "bufio"
-  "os"
-  "log"
+	"bufio"
 
-	"github.com/gin-gonic/gin"
-  _ "github.com/mattn/go-sqlite3"
+	"github.com/julienschmidt/httprouter"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
+
+//go:embed static/*
 var staticFiles embed.FS
 
 func executeSQLFile(filename string) {
-	file, err := os.Open(filename)
+	data, err := staticFiles.ReadFile("static/populate.sql")
 	if err != nil {
 		log.Println("Failed to open SQL file:", err)
 		return
 	}
-	defer file.Close()
 
-
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		query := scanner.Text()
 		if query != "" {
@@ -41,8 +41,8 @@ func executeSQLFile(filename string) {
 }
 
 func initDatabase() error {
-  var err error
-  db, err = sql.Open("sqlite3", "./vimtips.db")
+	var err error
+	db, err = sql.Open("sqlite3", "./vimtips.db")
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}
@@ -53,87 +53,94 @@ func initDatabase() error {
 		tip TEXT NOT NULL
 	);
 	`
-  _, err = db.Exec(createTableQuery)
+	_, err = db.Exec(createTableQuery)
 	if err != nil {
 		log.Fatal("Failed to create table:", err)
 	}
-  return db.Ping()
+	return db.Ping()
 }
 
 func tipCount() (int, error) {
-  var count int
-  err := db.QueryRow("SELECT COUNT(*) FROM tips").Scan(&count)
-  return count, err
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM tips").Scan(&count)
+	return count, err
 }
 
-func dailyTip(c *gin.Context) {
-  today := time.Now().Day()
-  var err error
+func dailyTip(w http.ResponseWriter, r *http.Request) {
+	today := time.Now().Day()
 
-  count, err := tipCount()
-  if err != nil {
-    fmt.Errorf("failed to fetch tip: %w", err)
-    return
-  }	
+	count, err := tipCount()
+	if err != nil {
+		http.Error(w, "Failed to fetch tip count", http.StatusInternalServerError)
+		return
+	}
 
-  dailyTip := today%count
-  var tip string
-  err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTip).Scan(&tip)
-  if err != nil {
-    fmt.Errorf("failed to fetch tip: %w", err)
-  }
-  c.JSON(http.StatusOK, gin.H{
-    "tip": tip,
-  })
+	dailyTip := today % count
+	var tip string
+	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTip).Scan(&tip)
+	if err != nil {
+		http.Error(w, "Failed to fetch daily tip", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf(`{"tip": "%s"}`, tip)))
 }
 
-func randomTip(c *gin.Context) {
+func randomTip(w http.ResponseWriter, r *http.Request) {
 	rand.Seed(time.Now().UnixNano())
 
-  var err error
-  count, err := tipCount()
-  if err != nil {
-    fmt.Errorf("failed to fetch tip: %w", err)
-    return
-  }	
+	count, err := tipCount()
+	if err != nil {
+		http.Error(w, "Failed to fetch tip count", http.StatusInternalServerError)
+		return
+	}
 
-  fmt.Println(count)
-  randomId := rand.Intn(count)
-  fmt.Println(randomId)
-  var tip string
-  err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", randomId).Scan(&tip)
-  if err != nil {
-    fmt.Errorf("failed to fetch tip: %w", err)
-  }
-  c.JSON(http.StatusOK, gin.H{
-    "tip": tip,
-  })
+	randomID := rand.Intn(count)
+	var tip string
+	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", randomID).Scan(&tip)
+	if err != nil {
+		http.Error(w, "Failed to fetch random tip", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf(`{"tip": "%s"}`, tip)))
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	content, err := staticFiles.ReadFile("static/index.html")
+	if err != nil {
+		http.Error(w, "Failed to load index.html", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write(content)
 }
 
 func main() {
-
-  err := initDatabase()
-  if err != nil {
-    log.Fatal(err)
-  }
+	err := initDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer db.Close()
-  executeSQLFile("./web/populate.sql")
+	executeSQLFile("static/populate.sql")
 
-  r := gin.Default()
-  r.StaticFS("/static", http.FS(staticFiles))
-  //r.Static("/static", "./static")
+	router := httprouter.New()
 
-  r.GET("/", func(c *gin.Context) {
-    c.File("static/index.html")
-  })
+	// Serve static files
+	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
 
-	// Route to get the daily tip
-	r.GET("/daily-tip", dailyTip)
-	// Route to get a random tip
-	r.GET("/random-tip", randomTip)
-
+	// Define routes
+	router.HandlerFunc(http.MethodGet, "/", indexHandler)
+	router.HandlerFunc(http.MethodGet, "/daily-tip", dailyTip)
+	router.HandlerFunc(http.MethodGet, "/random-tip", randomTip)
 
 	// Start server
-	r.Run(":8080")
+	log.Println("Server running on :8080")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
-
