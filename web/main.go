@@ -40,7 +40,7 @@ func executeSQLFile(filename string) {
 	}
 }
 
-func initDatabase() error {
+func initializeDatabase() error {
 	var err error
 	db, err = sql.Open("sqlite3", "./vimtips.db")
 	if err != nil {
@@ -123,19 +123,15 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	err := initDatabase()
-	if err != nil {
-		log.Fatal(err)
-	}
+  if err := initializeDatabase(); err != nil {
+    log.Fatalf("DB initialization failed: %v", err)
+  }
 	defer db.Close()
+
 	executeSQLFile("static/populate.sql")
 
 	router := httprouter.New()
-
-	// Serve static files
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
-
-	// Define routes
 	router.HandlerFunc(http.MethodGet, "/", indexHandler)
 	router.HandlerFunc(http.MethodGet, "/daily-tip", dailyTip)
 	router.HandlerFunc(http.MethodGet, "/random-tip", randomTip)
