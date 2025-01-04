@@ -61,11 +61,13 @@ func initializeDatabase() error {
 
 func tipCount() (int, error) {
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM tips").Scan(&count)
-	return count, err
+	if err := db.QueryRow("SELECT COUNT(*) FROM tips").Scan(&count); err != nil {
+    return 0, err
+  }
+	return count, nil
 }
 
-func dailyTip(w http.ResponseWriter, r *http.Request) {
+func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 	today := time.Now().Day()
 
 	count, err := tipCount()
@@ -74,9 +76,9 @@ func dailyTip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dailyTip := today % count
+	dailyTipID := today % count
 	var tip string
-	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTip).Scan(&tip)
+	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTipID).Scan(&tip)
 	if err != nil {
 		http.Error(w, "Failed to fetch daily tip", http.StatusInternalServerError)
 		return
@@ -87,7 +89,7 @@ func dailyTip(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"tip": "%s"}`, tip)))
 }
 
-func randomTip(w http.ResponseWriter, r *http.Request) {
+func randomTipHandler(w http.ResponseWriter, r *http.Request) {
 	rand.Seed(time.Now().UnixNano())
 
 	count, err := tipCount()
@@ -99,7 +101,7 @@ func randomTip(w http.ResponseWriter, r *http.Request) {
 	randomID := rand.Intn(count)
 	var tip string
 	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", randomID).Scan(&tip)
-	if err != nil {
+  if err != nil {
 		http.Error(w, "Failed to fetch random tip", http.StatusInternalServerError)
 		return
 	}
@@ -132,8 +134,8 @@ func main() {
 	router := httprouter.New()
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
 	router.HandlerFunc(http.MethodGet, "/", indexHandler)
-	router.HandlerFunc(http.MethodGet, "/daily-tip", dailyTip)
-	router.HandlerFunc(http.MethodGet, "/random-tip", randomTip)
+	router.HandlerFunc(http.MethodGet, "/daily-tip", dailyTipHandler)
+	router.HandlerFunc(http.MethodGet, "/random-tip", randomTipHandler)
 
 	// Start server
 	log.Println("Server running on :8080")
