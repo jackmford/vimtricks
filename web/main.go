@@ -21,8 +21,8 @@ var db *sql.DB
 //go:embed static/*
 var staticFiles embed.FS
 
-func executeSQLFile(filename string) {
-	data, err := staticFiles.ReadFile("static/populate.sql")
+func populateDatabase(filename string) {
+	data, err := staticFiles.ReadFile(filename)
 	if err != nil {
 		log.Println("Failed to open SQL file:", err)
 		return
@@ -32,8 +32,7 @@ func executeSQLFile(filename string) {
 	for scanner.Scan() {
 		query := scanner.Text()
 		if query != "" {
-			_, err = db.Exec(query)
-			if err != nil {
+			if _, err = db.Exec(query); err != nil {
 				log.Fatal("Failed to execute query:", query, "Error:", err)
 			}
 		}
@@ -42,10 +41,9 @@ func executeSQLFile(filename string) {
 
 func initializeDatabase() error {
 	var err error
-	db, err = sql.Open("sqlite3", "./vimtips.db")
-	if err != nil {
-		log.Fatal("Failed to open database:", err)
-	}
+	db, err = sql.Open("sqlite3", "./vimtips.db"); if err != nil {
+    return fmt.Errorf("Failed to open database: %v", err)
+  }
 
 	createTableQuery := `
 	CREATE TABLE IF NOT EXISTS tips (
@@ -53,10 +51,11 @@ func initializeDatabase() error {
 		tip TEXT NOT NULL
 	);
 	`
-	_, err = db.Exec(createTableQuery)
-	if err != nil {
-		log.Fatal("Failed to create table:", err)
+
+	if _, err = db.Exec(createTableQuery); err != nil {
+    return fmt.Errorf("Failed to create database table: %v", err)
 	}
+
 	return db.Ping()
 }
 
@@ -128,7 +127,7 @@ func main() {
   }
 	defer db.Close()
 
-	executeSQLFile("static/populate.sql")
+	populateDatabase("static/populate.sql")
 
 	router := httprouter.New()
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
