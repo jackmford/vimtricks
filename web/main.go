@@ -24,7 +24,7 @@ var staticFiles embed.FS
 func populateDatabase(filename string) {
 	data, err := staticFiles.ReadFile(filename)
 	if err != nil {
-		log.Println("Failed to open SQL file:", err)
+		log.Printf("Failed to open SQL file: %v", err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func populateDatabase(filename string) {
 		query := scanner.Text()
 		if query != "" {
 			if _, err = db.Exec(query); err != nil {
-				log.Fatal("Failed to execute query:", query, "Error:", err)
+				log.Fatalf("Failed to execute query: %v", err)
 			}
 		}
 	}
