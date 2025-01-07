@@ -76,7 +76,7 @@ func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dailyTipID := today % count
+	dailyTipID := count % today
 	var tip string
 	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTipID).Scan(&tip)
 	if err != nil {
