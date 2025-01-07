@@ -1,1 +1,1 @@
-Get your daily vim trick at [vimtricks.jackmitchellfordyce.com](vimtricks.jackmitchellfordyce.com). 🚀
+Get your daily vim trick at [vimtricks.jackmitchellfordyce.com](https://vimtricks.jackmitchellfordyce.com). 🚀
