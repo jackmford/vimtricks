@@ -1,13 +1,13 @@
 package main
 
 import (
-  "bytes"
-  "context"
+	"bytes"
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
-	"log" 
-  "math/rand"
+	"log"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -16,11 +16,11 @@ import (
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/mattn/go-sqlite3"
 
-  "go.opentelemetry.io/otel"
-  //"go.opentelemetry.io/otel/attribute"
-  "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	//"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var db *sql.DB
@@ -31,11 +31,12 @@ var tp *sdktrace.TracerProvider
 //go:embed static/*
 var staticFiles embed.FS
 
+
 // initTracer creates and registers trace provider instance.
-func initTracer() error {
+func initTracer() (trace.Tracer, error) {
 	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
-		return fmt.Errorf("failed to initialize stdouttrace exporter: %w", err)
+		return nil, fmt.Errorf("failed to initialize stdouttrace exporter: %w", err)
 	}
 	bsp := sdktrace.NewBatchSpanProcessor(exp)
 	tp = sdktrace.NewTracerProvider(
@@ -43,7 +44,8 @@ func initTracer() error {
 		sdktrace.WithSpanProcessor(bsp),
 	)
 	otel.SetTracerProvider(tp)
-	return nil
+  tracer := otel.Tracer("github.com/jackmford/vimtricks")
+	return tracer, nil
 }
 
 func populateDatabase(filename string) error {
@@ -65,9 +67,18 @@ func populateDatabase(filename string) error {
   return nil
 }
 
-func initializeDatabase() error {
+func initializeDatabase(ctx context.Context) error {
+
+  tracer := otel.Tracer("github.com/jackmford/vimtricks")
+  _, span := tracer.Start(ctx, "Sub operation...")
+	defer span.End()
+
+	span.AddEvent("Init db event")
+
+
 	var err error
 	db, err = sql.Open("sqlite3", "./vimtips.db"); if err != nil {
+    span.RecordError(err)
     return fmt.Errorf("Failed to open database: %v", err)
   }
 
@@ -79,6 +90,7 @@ func initializeDatabase() error {
 	`
 
 	if _, err = db.Exec(createTableQuery); err != nil {
+    span.RecordError(err)
     return fmt.Errorf("Failed to create database table: %v", err)
 	}
 
@@ -138,12 +150,11 @@ func randomTipHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-
-  tracer := otel.Tracer("go.opentelemetry.io/contrib/examples/namedtracer")
+  tracer := otel.Tracer("github.com/jackmford/vimtricks")
   _, span := tracer.Start(r.Context(), "Sub operation...")
 	defer span.End()
 
-	span.AddEvent("Sub span event")
+	span.AddEvent("Index Handler")
 
 	content, err := staticFiles.ReadFile("static/index.html")
 	if err != nil {
@@ -158,7 +169,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
   // initialize trace provider.
-	if err := initTracer(); err != nil {
+	if _, err := initTracer(); err != nil {
 		log.Panic(err)
 	}
 
@@ -171,7 +182,7 @@ func main() {
 	//ctx, span = tracer.Start(ctx, "operation")
 	//defer span.End()
 
-  if err := initializeDatabase(); err != nil {
+  if err := initializeDatabase(ctx); err != nil {
     log.Fatalf("DB initialization failed: %v", err)
   }
 
