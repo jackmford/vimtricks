@@ -1,7 +1,6 @@
 package main
 
 import (
-  "bytes"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -9,8 +8,6 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
-
-	"bufio"
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/mattn/go-sqlite3"
@@ -20,44 +17,6 @@ var db *sql.DB
 
 //go:embed static/*
 var staticFiles embed.FS
-
-func populateDatabase(filename string) {
-	data, err := staticFiles.ReadFile(filename)
-	if err != nil {
-		log.Printf("Failed to open SQL file: %v", err)
-		return
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		query := scanner.Text()
-		if query != "" {
-			if _, err = db.Exec(query); err != nil {
-				log.Fatalf("Failed to execute query: %v", err)
-			}
-		}
-	}
-}
-
-func initializeDatabase() error {
-	var err error
-	db, err = sql.Open("sqlite3", "./vimtips.db"); if err != nil {
-    return fmt.Errorf("Failed to open database: %v", err)
-  }
-
-	createTableQuery := `
-	CREATE TABLE IF NOT EXISTS tips (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		tip TEXT NOT NULL
-	);
-	`
-
-	if _, err = db.Exec(createTableQuery); err != nil {
-    return fmt.Errorf("Failed to create database table: %v", err)
-	}
-
-	return db.Ping()
-}
 
 func tipCount() (int, error) {
 	var count int
@@ -124,12 +83,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-  if err := initializeDatabase(); err != nil {
+  if err := InitializeDatabase(); err != nil {
     log.Fatalf("DB initialization failed: %v", err)
   }
 	defer db.Close()
 
-	populateDatabase("static/populate.sql")
+	PopulateDatabase("static/populate.sql")
 
 	router := httprouter.New()
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))

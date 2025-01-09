@@ -11,7 +11,7 @@ all: build
 build: $(GO_FILES)
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME) ./web/main.go
+	go build -o $(BUILD_DIR)/$(APP_NAME) $(GO_FILES)
 	@echo "Build complete. Binary located at $(BUILD_DIR)/$(APP_NAME)."
 
 run: build
