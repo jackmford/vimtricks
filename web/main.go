@@ -17,7 +17,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -27,6 +26,8 @@ var db *sql.DB
 
 
 var tp *sdktrace.TracerProvider
+
+var tracer trace.Tracer
 
 //go:embed static/*
 var staticFiles embed.FS
@@ -44,7 +45,7 @@ func initTracer() (trace.Tracer, error) {
 		sdktrace.WithSpanProcessor(bsp),
 	)
 	otel.SetTracerProvider(tp)
-  tracer := otel.Tracer("github.com/jackmford/vimtricks")
+  tracer = otel.Tracer("github.com/jackmford/vimtricks")
 	return tracer, nil
 }
 
@@ -68,8 +69,6 @@ func populateDatabase(filename string) error {
 }
 
 func initializeDatabase(ctx context.Context) error {
-
-  tracer := otel.Tracer("github.com/jackmford/vimtricks")
   _, span := tracer.Start(ctx, "Sub operation...")
 	defer span.End()
 
@@ -97,7 +96,10 @@ func initializeDatabase(ctx context.Context) error {
 	return db.Ping()
 }
 
-func tipCount() (int, error) {
+func tipCount(ctx context.Context) (int, error) {
+  ctx, childSpan := tracer.Start(ctx, "tipCount retrieval")
+  defer childSpan.End()
+
 	var count int
 	if err := db.QueryRow("SELECT COUNT(*) FROM tips").Scan(&count); err != nil {
     return 0, err
@@ -106,9 +108,14 @@ func tipCount() (int, error) {
 }
 
 func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
+  ctx, span := tracer.Start(r.Context(), "Daily tip operation")
+	defer span.End()
+
+	span.AddEvent("Daily tip event")
+
 	today := time.Now().Day()
 
-	count, err := tipCount()
+	count, err := tipCount(ctx)
 	if err != nil {
 		http.Error(w, "Failed to fetch tip count", http.StatusInternalServerError)
 		return
@@ -130,7 +137,7 @@ func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 func randomTipHandler(w http.ResponseWriter, r *http.Request) {
 	rand.Seed(time.Now().UnixNano())
 
-	count, err := tipCount()
+	count, err := tipCount(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to fetch tip count", http.StatusInternalServerError)
 		return
@@ -150,8 +157,7 @@ func randomTipHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-  tracer := otel.Tracer("github.com/jackmford/vimtricks")
-  _, span := tracer.Start(r.Context(), "Sub operation...")
+  _, span := tracer.Start(r.Context(), "Index handler...")
 	defer span.End()
 
 	span.AddEvent("Index Handler")
@@ -173,14 +179,8 @@ func main() {
 		log.Panic(err)
 	}
 
-	// Create a named tracer with package path as its name.
-	//tracer := tp.Tracer("vimtricks")
 	ctx := context.Background()
 	defer func() { _ = tp.Shutdown(ctx) }()
-
-  //var span trace.Span
-	//ctx, span = tracer.Start(ctx, "operation")
-	//defer span.End()
 
   if err := initializeDatabase(ctx); err != nil {
     log.Fatalf("DB initialization failed: %v", err)
@@ -190,8 +190,6 @@ func main() {
       panic(err)
     }
 	defer db.Close()
-
-	//populateDatabase("static/populate.sql")
 
 	router := httprouter.New()
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
