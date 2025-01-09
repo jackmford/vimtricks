@@ -2,11 +2,12 @@ package main
 
 import (
   "bytes"
+  "context"
 	"database/sql"
 	"embed"
 	"fmt"
-	"log"
-	"math/rand"
+	"log" 
+  "math/rand"
 	"net/http"
 	"time"
 
@@ -14,18 +15,42 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/mattn/go-sqlite3"
+
+  "go.opentelemetry.io/otel"
+  //"go.opentelemetry.io/otel/attribute"
+  "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	//"go.opentelemetry.io/otel/trace"
 )
 
 var db *sql.DB
 
+
+var tp *sdktrace.TracerProvider
+
 //go:embed static/*
 var staticFiles embed.FS
 
-func populateDatabase(filename string) {
+// initTracer creates and registers trace provider instance.
+func initTracer() error {
+	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+	if err != nil {
+		return fmt.Errorf("failed to initialize stdouttrace exporter: %w", err)
+	}
+	bsp := sdktrace.NewBatchSpanProcessor(exp)
+	tp = sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithSpanProcessor(bsp),
+	)
+	otel.SetTracerProvider(tp)
+	return nil
+}
+
+func populateDatabase(filename string) error {
 	data, err := staticFiles.ReadFile(filename)
 	if err != nil {
 		log.Printf("Failed to open SQL file: %v", err)
-		return
+		return err
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -37,6 +62,7 @@ func populateDatabase(filename string) {
 			}
 		}
 	}
+  return nil
 }
 
 func initializeDatabase() error {
@@ -112,6 +138,13 @@ func randomTipHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+
+  tracer := otel.Tracer("go.opentelemetry.io/contrib/examples/namedtracer")
+  _, span := tracer.Start(r.Context(), "Sub operation...")
+	defer span.End()
+
+	span.AddEvent("Sub span event")
+
 	content, err := staticFiles.ReadFile("static/index.html")
 	if err != nil {
 		http.Error(w, "Failed to load index.html", http.StatusInternalServerError)
@@ -124,12 +157,30 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+  // initialize trace provider.
+	if err := initTracer(); err != nil {
+		log.Panic(err)
+	}
+
+	// Create a named tracer with package path as its name.
+	//tracer := tp.Tracer("vimtricks")
+	ctx := context.Background()
+	defer func() { _ = tp.Shutdown(ctx) }()
+
+  //var span trace.Span
+	//ctx, span = tracer.Start(ctx, "operation")
+	//defer span.End()
+
   if err := initializeDatabase(); err != nil {
     log.Fatalf("DB initialization failed: %v", err)
   }
+
+  if err := populateDatabase("static/populate.sql"); err != nil {
+      panic(err)
+    }
 	defer db.Close()
 
-	populateDatabase("static/populate.sql")
+	//populateDatabase("static/populate.sql")
 
 	router := httprouter.New()
 	router.Handler(http.MethodGet, "/static/*filepath", http.FileServer(http.FS(staticFiles)))
