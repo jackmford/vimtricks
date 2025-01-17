@@ -1,5 +1,5 @@
 builds:
-  - main: ./web/main.go
+  - main: ./web
     goos:
       - linux
     goarch:
