@@ -28,6 +28,7 @@ func tipCount() (int, error) {
 
 func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 	today := time.Now().Day()
+  rand.Seed(int64(today))
 
 	count, err := tipCount()
 	if err != nil {
@@ -35,7 +36,7 @@ func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dailyTipID := count % today
+	dailyTipID := rand.Intn(count)
 	var tip string
 	err = db.QueryRow("SELECT tip FROM tips WHERE id = ?", dailyTipID).Scan(&tip)
 	if err != nil {
@@ -49,7 +50,6 @@ func dailyTipHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func randomTipHandler(w http.ResponseWriter, r *http.Request) {
-	rand.Seed(time.Now().UnixNano())
 
 	count, err := tipCount()
 	if err != nil {
