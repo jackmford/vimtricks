@@ -17,9 +17,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	//"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	//"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 )
 
 var db *sql.DB
@@ -34,8 +36,13 @@ var staticFiles embed.FS
 
 
 // initTracer creates and registers trace provider instance.
-func initTracer() (trace.Tracer, error) {
-	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+func initTracer(ctx context.Context) (trace.Tracer, error) {
+	//exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+  exp, err := otlptracehttp.New(ctx,
+    otlptracehttp.WithEndpoint("localhost:4318"),
+    otlptracehttp.WithInsecure(),
+    )
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize stdouttrace exporter: %w", err)
 	}
@@ -175,12 +182,13 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
   // initialize trace provider.
-	if _, err := initTracer(); err != nil {
+	ctx := context.Background()
+	defer func() { _ = tp.Shutdown(ctx) }()
+
+	if _, err := initTracer(ctx); err != nil {
 		log.Panic(err)
 	}
 
-	ctx := context.Background()
-	defer func() { _ = tp.Shutdown(ctx) }()
 
   if err := initializeDatabase(ctx); err != nil {
     log.Fatalf("DB initialization failed: %v", err)
